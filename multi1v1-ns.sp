@@ -11,7 +11,7 @@
 
 #define m_flNextSecondaryAttack FindSendPropInfo("CBaseCombatWeapon", "m_flNextSecondaryAttack") 
 
-bool g_Noscope = false;
+bool g_Noscope[MAXPLAYERS+1] = false;
 
 ConVar gh_MessageLoc, gh_Ranked, gh_KnifeDamage;
 
@@ -20,7 +20,7 @@ public Plugin myinfo =
     name = "CS:GO Multi1v1: Noscope round addon",
     author = "Cruze",
     description = "Adds an noscope round-type",
-    version = "1.0",
+    version = "1.1",
     url = "http://steamcommunity.com/profiles/76561198132924835"
 };
 
@@ -57,7 +57,7 @@ public Action PreThink(int client)
 
 		char item[64];
 		GetEdictClassname(weapon, item, sizeof(item)); 
-		if(g_Noscope && StrEqual(item, "weapon_awp"))// || StrEqual(item, "weapon_scout") || StrEqual(item, "weapon_ssg08"))
+		if(g_Noscope[client] && StrEqual(item, "weapon_awp"))// || StrEqual(item, "weapon_scout") || StrEqual(item, "weapon_ssg08"))
 		{
 			SetEntDataFloat(weapon, m_flNextSecondaryAttack, GetGameTime() + 9999.9);
 		}
@@ -67,7 +67,7 @@ public Action PreThink(int client)
 
 public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3])
 {
-	if (!IsValidEntity(weapon) || !g_Noscope || gh_KnifeDamage.BoolValue)
+	if (!IsValidEntity(weapon) || gh_KnifeDamage.BoolValue)
 		return Plugin_Continue;
 	if (attacker <= 0 || attacker > MaxClients)
 		return Plugin_Continue;
@@ -75,8 +75,11 @@ public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float
 	GetEntityClassname(weapon, WeaponName, sizeof(WeaponName));
 	if(StrContains(WeaponName, "knife", false) != -1 || StrContains(WeaponName, "bayonet", false) != -1 || StrContains(WeaponName, "fists", false) != -1 || StrContains(WeaponName, "axe", false) != -1 || StrContains(WeaponName, "hammer", false) != -1 || StrContains(WeaponName, "spanner", false) != -1 || StrContains(WeaponName, "melee", false) != -1)
 	{
-		PrintCenterText(attacker, "Knife damage is disabled in this round.");
-		return Plugin_Handled;
+		if(g_Noscope[attacker] && g_Noscope[victim])
+		{
+			PrintCenterText(attacker, "Knife damage is disabled in this round.");
+			return Plugin_Handled;
+		}
 	}
 	return Plugin_Continue;
 }
@@ -97,7 +100,7 @@ public void NoscopeHandler(int client)
 	int offset = FindSendPropInfo("CCSPlayer", "m_bHasHelmet");
 	SetEntData(client, offset, true);
 	
-	g_Noscope = true;
+	g_Noscope[client] = true;
 
 	if(gh_MessageLoc.BoolValue)
 		PrintHintText(client, "<font color='#8b0000'>This is a noscope only round!</font>");
@@ -108,5 +111,11 @@ public void NoscopeHandler(int client)
 // Reset stuff
 public Action CS_OnTerminateRound(float &delay, CSRoundEndReason &reason)
 {
-	g_Noscope = false;
+	for(int client = 1; client <= MaxClients; client++)
+	{
+		if(client > 0 && client <= MaxClients && IsClientInGame(client))
+		{
+			g_Noscope[client] = false;
+		}
+	}
 }
