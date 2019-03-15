@@ -17,12 +17,14 @@ bool g_Noscope[MAXPLAYERS+1] = false;
 
 ConVar gh_MessageLoc, gh_Ranked, gh_KnifeDamage, gh_Weapon;
 
+int Rand;
+
 public Plugin myinfo =
 {
     name = "CS:GO Multi1v1: Noscope round addon",
     author = "Cruze",
     description = "Adds an noscope round-type",
-    version = "1.2",
+    version = "1.2.1",
     url = "http://steamcommunity.com/profiles/76561198132924835"
 };
 
@@ -41,6 +43,7 @@ public void OnPluginStart()
 	gh_KnifeDamage  = CreateConVar("sm_1v1_ns_knifedmg", 	"0", "1 - Enable or 0 - Disable knife damage in noscope round.");
 	gh_Weapon		= CreateConVar("sm_1v1_ns_weapon", 		"3", "1 - AWP, 2 - SSG 08, 3 - Both");
 	
+	HookEvent("round_start", Event_RoundStart);
 	AutoExecConfig(true, "plugin.1v1ns");
 	LoadTranslations("multi1v1-ns.phrases");
 }
@@ -104,9 +107,15 @@ public void Multi1v1_OnRoundTypesAdded()
 	}
 }
 
+public void Event_RoundStart(Event ev, char[] name, bool dbc)
+{
+	if(gh_Weapon.IntValue == 3)
+		Rand = GetRandomInt(1, 2);
+}
+
 public void NoscopeHandler(int client)
 {
-	int iWeapon, Rand;
+	int iWeapon;
 	if(gh_Weapon.IntValue == 1)	
 	{
 		iWeapon = GivePlayerItem(client, "weapon_awp");
@@ -117,7 +126,6 @@ public void NoscopeHandler(int client)
 	}
 	else if(gh_Weapon.IntValue == 3)
 	{
-		Rand = GetRandomInt(1, 2);
 		if(Rand == 1)
 		{
 			iWeapon = GivePlayerItem(client, "weapon_awp");
