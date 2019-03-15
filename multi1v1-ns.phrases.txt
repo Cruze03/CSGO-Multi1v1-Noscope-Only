@@ -6,7 +6,7 @@
 	}
 	"ThisIsNoscopeHintText"
 	{
-		"en"		"<font color='#8b0000'>This is a noscope only round!</font>"
+		"en"		"<font color='#ff0000'>This is a noscope only round!</font>"
 	}
 	"ThisIsNoscopeChat"
 	{
