@@ -24,7 +24,7 @@ public Plugin myinfo =
     name = "CS:GO Multi1v1: Noscope round addon",
     author = "Cruze",
     description = "Adds an noscope round-type",
-    version = "1.2.1",
+    version = "1.2.5",
     url = "http://steamcommunity.com/profiles/76561198132924835"
 };
 
@@ -34,8 +34,7 @@ public void OnPluginStart()
 	{
 		if(client > 0 && client <= MaxClients && IsClientInGame(client))
 		{
-			SDKHook(client, SDKHook_PreThink, PreThink);
-			SDKHook(client, SDKHook_OnTakeDamageAlive, OnTakeDamageAlive);
+			OnClientPutInServer(client);
 		}
 	}
 	gh_MessageLoc 	= CreateConVar("sm_1v1_ns_msgloc", 		"1", "Message location of \"This is noscope round\" message. 0 = Chat. 1 = Hintbox");
@@ -52,11 +51,12 @@ public void OnClientPutInServer(int client)
 {
 	SDKHook(client, SDKHook_PreThink, PreThink);
 	SDKHook(client, SDKHook_OnTakeDamageAlive, OnTakeDamageAlive);
+	g_Noscope[client] = false;
 }
 
 public Action PreThink(int client)
 {
-	if(IsPlayerAlive(client))
+	if(IsPlayerAlive(client) && g_Noscope[client])
 	{
 		int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 		if(!IsValidEdict(weapon) || !IsValidEntity(weapon))
@@ -64,7 +64,7 @@ public Action PreThink(int client)
 
 		char item[64];
 		GetEdictClassname(weapon, item, sizeof(item)); 
-		if(g_Noscope[client] && StrEqual(item, "weapon_awp") || StrEqual(item, "weapon_ssg08"))
+		if(StrEqual(item, "weapon_awp") || StrEqual(item, "weapon_ssg08"))
 		{
 			SetEntDataFloat(weapon, m_flNextSecondaryAttack, GetGameTime() + 9999.9);
 		}
@@ -82,15 +82,20 @@ public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float
 	{
 		return Plugin_Continue;
 	}
-	char WeaponName[20];
+	if (victim <= 0 || victim > MaxClients)
+	{
+		return Plugin_Continue;
+	}
+	if(!g_Noscope[attacker] || !g_Noscope[victim])
+	{
+		return Plugin_Continue;
+	}
+	char WeaponName[64];
 	GetEntityClassname(weapon, WeaponName, sizeof(WeaponName));
 	if(StrContains(WeaponName, "knife", false) != -1 || StrContains(WeaponName, "bayonet", false) != -1 || StrContains(WeaponName, "fists", false) != -1 || StrContains(WeaponName, "axe", false) != -1 || StrContains(WeaponName, "hammer", false) != -1 || StrContains(WeaponName, "spanner", false) != -1 || StrContains(WeaponName, "melee", false) != -1)
 	{
-		if(g_Noscope[attacker] && g_Noscope[victim])
-		{
-			PrintCenterText(attacker, "%t", "KnifeDamageDisabled");
-			return Plugin_Handled;
-		}
+		PrintCenterText(attacker, "%t", "KnifeDamageDisabled");
+		return Plugin_Handled;
 	}
 	return Plugin_Continue;
 }
@@ -107,7 +112,7 @@ public void Multi1v1_OnRoundTypesAdded()
 	}
 }
 
-public void Event_RoundStart(Event ev, char[] name, bool dbc)
+public Action Event_RoundStart(Event ev, char[] name, bool dbc)
 {
 	if(gh_Weapon.IntValue == 3)
 		Rand = GetRandomInt(1, 2);
@@ -115,7 +120,7 @@ public void Event_RoundStart(Event ev, char[] name, bool dbc)
 
 public void NoscopeHandler(int client)
 {
-	int iWeapon;
+	int iWeapon = -1;
 	if(gh_Weapon.IntValue == 1)	
 	{
 		iWeapon = GivePlayerItem(client, "weapon_awp");
@@ -139,7 +144,10 @@ public void NoscopeHandler(int client)
 	{
 		SetFailState("Wrong integer value in \"sm_1v1_ns_weapon\"");
 	}
-	EquipPlayerWeapon(client, iWeapon);
+	if(iWeapon != -1)
+	{
+		EquipPlayerWeapon(client, iWeapon);
+	}
 	Multi1v1_GivePlayerKnife(client);
 	
 	g_Noscope[client] = true;
