@@ -13,50 +13,63 @@ Thanks Abner. Took help from his noscope only plugin. Took help from that code.
 
 #define m_flNextSecondaryAttack FindSendPropInfo("CBaseCombatWeapon", "m_flNextSecondaryAttack") 
 
-bool g_Noscope[MAXPLAYERS+1] = false;
+bool g_bNoscope[MAXPLAYERS+1] = {false, ...};
 
-ConVar gh_MessageLoc, gh_Ranked, gh_KnifeDamage, gh_Weapon;
+ConVar g_hMessageLoc, g_hRanked, g_hKnifeDamage, g_hWeapon;
 
-int Rand;
+int g_iRand = 1;
 
 public Plugin myinfo =
 {
     name = "CS:GO Multi1v1: Noscope round addon",
     author = "Cruze",
     description = "Adds an noscope round-type",
-    version = "1.2.5",
+    version = "1.2.6",
     url = "http://steamcommunity.com/profiles/76561198132924835"
 };
 
 public void OnPluginStart()
 {
+	g_hMessageLoc 	= CreateConVar("sm_1v1_ns_msgloc", 		"1", "Message location of \"This is noscope round\" message. 0 = Chat. 1 = Hintbox");
+	g_hRanked 		= CreateConVar("sm_1v1_ns_ranked", 		"1", "Ranked? 0 for no.");
+	g_hKnifeDamage  = CreateConVar("sm_1v1_ns_knifedmg", 	"0", "1 - Enable or 0 - Disable knife damage in noscope round.");
+	g_hWeapon		= CreateConVar("sm_1v1_ns_weapon", 		"3", "1 - AWP, 2 - SSG 08, 3 - Both");
+	
+	AutoExecConfig(true, "plugin.1v1ns");
+
+	HookEvent("round_start", Event_RoundStart, EventHookMode_Pre);
+	HookEvent("round_end", Event_RoundEnd);
+
+	LoadTranslations("multi1v1-ns.phrases");
+	
 	for(int client = 1; client <= MaxClients; client++)
 	{
-		if(client > 0 && client <= MaxClients && IsClientInGame(client))
+		if(IsClientInGame(client))
 		{
 			OnClientPutInServer(client);
 		}
 	}
-	gh_MessageLoc 	= CreateConVar("sm_1v1_ns_msgloc", 		"1", "Message location of \"This is noscope round\" message. 0 = Chat. 1 = Hintbox");
-	gh_Ranked 		= CreateConVar("sm_1v1_ns_ranked", 		"1", "Ranked? 0 for no.");
-	gh_KnifeDamage  = CreateConVar("sm_1v1_ns_knifedmg", 	"0", "1 - Enable or 0 - Disable knife damage in noscope round.");
-	gh_Weapon		= CreateConVar("sm_1v1_ns_weapon", 		"3", "1 - AWP, 2 - SSG 08, 3 - Both");
-	
-	HookEvent("round_start", Event_RoundStart);
-	AutoExecConfig(true, "plugin.1v1ns");
-	LoadTranslations("multi1v1-ns.phrases");
+}
+
+public void OnMapStart()
+{
+	for(int client = 0; client < MaxClients; client++)
+	{
+		g_bNoscope[client] = false;
+	}
+	g_iRand = 1;
 }
 
 public void OnClientPutInServer(int client)
 {
 	SDKHook(client, SDKHook_PreThink, PreThink);
 	SDKHook(client, SDKHook_OnTakeDamageAlive, OnTakeDamageAlive);
-	g_Noscope[client] = false;
+	g_bNoscope[client] = false;
 }
 
 public Action PreThink(int client)
 {
-	if(IsPlayerAlive(client) && g_Noscope[client])
+	if(IsPlayerAlive(client) && g_bNoscope[client])
 	{
 		int weapon = GetEntPropEnt(client, Prop_Send, "m_hActiveWeapon");
 		if(!IsValidEdict(weapon) || !IsValidEntity(weapon))
@@ -74,7 +87,7 @@ public Action PreThink(int client)
 
 public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float &damage, int &damagetype, int &weapon, float damageForce[3], float damagePosition[3])
 {
-	if (!IsValidEntity(weapon) || gh_KnifeDamage.BoolValue)
+	if (!IsValidEntity(weapon) || g_hKnifeDamage.BoolValue)
 	{
 		return Plugin_Continue;
 	}
@@ -86,7 +99,7 @@ public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float
 	{
 		return Plugin_Continue;
 	}
-	if(!g_Noscope[attacker] || !g_Noscope[victim])
+	if(!g_bNoscope[attacker] || !g_bNoscope[victim])
 	{
 		return Plugin_Continue;
 	}
@@ -102,7 +115,7 @@ public Action OnTakeDamageAlive(int victim, int &attacker, int &inflictor, float
 
 public void Multi1v1_OnRoundTypesAdded()
 {
-	if(gh_Ranked.BoolValue)
+	if(g_hRanked.BoolValue)
 	{
 		Multi1v1_AddRoundType("NoScope", "noscope", NoscopeHandler, true, true, "NoscopeOnly", true);
 	}
@@ -114,24 +127,25 @@ public void Multi1v1_OnRoundTypesAdded()
 
 public Action Event_RoundStart(Event ev, char[] name, bool dbc)
 {
-	if(gh_Weapon.IntValue == 3)
-		Rand = GetRandomInt(1, 2);
+	if(g_hWeapon.IntValue == 3)
+		g_iRand = GetRandomInt(1, 2);
 }
 
 public void NoscopeHandler(int client)
 {
+	Multi1v1_GivePlayerKnife(client);
 	int iWeapon = -1;
-	if(gh_Weapon.IntValue == 1)	
+	if(g_hWeapon.IntValue == 1)	
 	{
 		iWeapon = GivePlayerItem(client, "weapon_awp");
 	}
-	else if(gh_Weapon.IntValue == 2)
+	else if(g_hWeapon.IntValue == 2)
 	{
 		iWeapon = GivePlayerItem(client, "weapon_ssg08");
 	}
-	else if(gh_Weapon.IntValue == 3)
+	else if(g_hWeapon.IntValue == 3)
 	{
-		if(Rand == 1)
+		if(g_iRand == 1)
 		{
 			iWeapon = GivePlayerItem(client, "weapon_awp");
 		}
@@ -142,17 +156,16 @@ public void NoscopeHandler(int client)
 	}
 	else
 	{
-		SetFailState("Wrong integer value in \"sm_1v1_ns_weapon\"");
+		SetFailState("[Multi1v1-NS] Wrong integer value in \"sm_1v1_ns_weapon\"");
 	}
 	if(iWeapon != -1)
 	{
 		EquipPlayerWeapon(client, iWeapon);
 	}
-	Multi1v1_GivePlayerKnife(client);
 	
-	g_Noscope[client] = true;
+	g_bNoscope[client] = true;
 
-	if(gh_MessageLoc.BoolValue)
+	if(g_hMessageLoc.BoolValue)
 	{
 		PrintHintText(client, "%t", "ThisIsNoscopeHintText");
 	}
@@ -165,11 +178,18 @@ public void NoscopeHandler(int client)
 // Reset stuff
 public Action CS_OnTerminateRound(float &delay, CSRoundEndReason &reason)
 {
-	for(int client = 1; client <= MaxClients; client++)
+	for(int client = 0; client < MaxClients; client++)
 	{
-		if(client > 0 && client <= MaxClients && IsClientInGame(client))
-		{
-			g_Noscope[client] = false;
-		}
+		g_bNoscope[client] = false;
 	}
+	g_iRand = 1;
+}
+
+public Action Event_RoundEnd(Event ev, char[] name, bool dbc)
+{
+	for(int client = 0; client < MaxClients; client++)
+	{
+		g_bNoscope[client] = false;
+	}
+	g_iRand = 1;
 }
